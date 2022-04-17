@@ -20,7 +20,7 @@ services:
       # see: https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html
       discovery.type: single-node
     networks:
-      - elasticsearch
+      - elk
 
   kibana:
     build:
@@ -38,8 +38,7 @@ services:
       KIBANA_USERNAME: ${KIBANA_USERNAME:-}
       KIBANA_PASSWORD: ${KIBANA_PASSWORD:-}
     networks:
-      - elasticsearch
-      - kibana
+      - elk
     depends_on:
       - elasticsearch
 
@@ -48,14 +47,13 @@ services:
       context: beats/packetbeat/
       args:
         ELK_VERSION: ${ELK_VERSION}
-    container_name: ${PACKETBEAT_HOST}
-    restart: on-failure
+    container_name: ${PACKETBEAT_INDEX}
     user: root
     volumes:
       - ./beats/packetbeat/config/packetbeat.yml:/usr/share/packetbeat/packetbeat.yml:ro,z
       - packetbeat:/usr/share/packetbeat/data:z
     environment:
-      - PACKETBEAT_HOST=${PACKETBEAT_HOST}
+      - PACKETBEAT_INDEX=${PACKETBEAT_INDEX}
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-}
       - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT:-}
       - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME:-}
@@ -69,31 +67,24 @@ services:
       - NET_ADMIN
     network_mode: host
     extra_hosts:
-      - "elasticsearch:172.17.0.1" # The IP of docker0 interface to access host from container
-      - "kibana:172.17.0.1" # The IP of docker0 interface to access host from container
-      - "hello-world-rest:172.17.0.1" # The IP of docker0 interface to access host from container
+      - "elasticsearch:127.0.0.1" # The IP of docker0 interface to access host from container
+      - "kibana:127.0.0.1" # The IP of docker0 interface to access host from container
     depends_on:
       - elasticsearch
       - kibana
       - hello-world-rest
+    restart: on-failure
     command: ["--strict.perms=false"]
 
   hello-world-rest:
     image: vad1mo/hello-world-rest
     container_name: "hello-world-rest"
     ports:
-      - "5000:5050"
-    networks:
-      - hello-world-rest
+      - "5050:5050"
 
 volumes:
   elasticsearch:
   packetbeat:
 
 networks:
-  elasticsearch:
-  kibana:
-  hello-world-rest:
-  packetbeat:
-    external:
-      name: packetbeat
+  elk:
