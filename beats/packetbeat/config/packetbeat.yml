@@ -1,0 +1,41 @@
+#============================== Network device ================================
+packetbeat.interfaces.device: any
+
+#================================== Flows =====================================
+packetbeat.flows:
+  timeout: 30s
+  period: 10s
+
+#========================== Transaction protocols =============================
+packetbeat.protocols:
+  - type: http
+    ports: [5000, 5050]
+    send_headers: true
+    send_request: true
+    send_response: true
+    decode_body: true
+    index: ${PACKETBEAT_HOST}-http
+
+processors:
+  - add_cloud_metadata:
+
+#========================== Elasticsearch output ===============================
+output.elasticsearch:
+  hosts: ["${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}"]
+  username: ${ELASTICSEARCH_USERNAME}
+  password: ${ELASTICSEARCH_PASSWORD}
+  index: ${PACKETBEAT_HOST}-%{+yyyy.MM.dd}
+
+#============================== Dashboards =====================================
+setup.dashboards:
+  enabled: true
+
+setup.template:
+  name: "${PACKETBEAT_HOST}"
+  pattern: "${PACKETBEAT_HOST}-*"
+
+#============================== Kibana =========================================
+setup.kibana:
+  host: "${KIBANA_HOST}:${KIBANA_PORT}"
+  username: ${KIBANA_USERNAME}
+  password: ${KIBANA_PASSWORD}

@@ -1,0 +1,99 @@
+version: "3.9"
+
+services:
+  elasticsearch:
+    build:
+      context: elasticsearch/
+      args:
+        ELK_VERSION: ${ELK_VERSION}
+    container_name: ${ELASTICSEARCH_HOST}
+    ports:
+      - "${ELASTICSEARCH_PORT}:9200"
+      - "9300:9300"
+    volumes:
+      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
+      - elasticsearch:/usr/share/elasticsearch/data:z
+    environment:
+      ES_JAVA_OPTS: -Xmx256m -Xms256m
+      ELASTIC_PASSWORD: ${ELASTICSEARCH_PASSWORD:-}
+      # Use single node discovery in order to disable production mode and avoid bootstrap checks.
+      # see: https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html
+      discovery.type: single-node
+    networks:
+      - elasticsearch
+
+  kibana:
+    build:
+      context: kibana/
+      args:
+        ELK_VERSION: ${ELK_VERSION}
+    container_name: ${KIBANA_HOST}
+    ports:
+      - "${KIBANA_PORT}:5601"
+    volumes:
+      - ./kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro,z
+    environment:
+      ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-}
+      ELASTICSEARCH_PORT: ${ELASTICSEARCH_PORT:-}
+      KIBANA_USERNAME: ${KIBANA_USERNAME:-}
+      KIBANA_PASSWORD: ${KIBANA_PASSWORD:-}
+    networks:
+      - elasticsearch
+      - kibana
+    depends_on:
+      - elasticsearch
+
+  packetbeat:
+    build:
+      context: beats/packetbeat/
+      args:
+        ELK_VERSION: ${ELK_VERSION}
+    container_name: ${PACKETBEAT_HOST}
+    restart: on-failure
+    user: root
+    volumes:
+      - ./beats/packetbeat/config/packetbeat.yml:/usr/share/packetbeat/packetbeat.yml:ro,z
+      - packetbeat:/usr/share/packetbeat/data:z
+    environment:
+      - PACKETBEAT_HOST=${PACKETBEAT_HOST}
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-}
+      - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT:-}
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME:-}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-}
+      - KIBANA_HOST=${KIBANA_HOST:-}
+      - KIBANA_PORT=${KIBANA_PORT:-}
+      - KIBANA_USERNAME=${KIBANA_USERNAME:-}
+      - KIBANA_PASSWORD=${KIBANA_PASSWORD:-}
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    network_mode: host
+    extra_hosts:
+      - "elasticsearch:172.17.0.1" # The IP of docker0 interface to access host from container
+      - "kibana:172.17.0.1" # The IP of docker0 interface to access host from container
+      - "hello-world-rest:172.17.0.1" # The IP of docker0 interface to access host from container
+    depends_on:
+      - elasticsearch
+      - kibana
+      - hello-world-rest
+    command: ["--strict.perms=false"]
+
+  hello-world-rest:
+    image: vad1mo/hello-world-rest
+    container_name: "hello-world-rest"
+    ports:
+      - "5000:5050"
+    networks:
+      - hello-world-rest
+
+volumes:
+  elasticsearch:
+  packetbeat:
+
+networks:
+  elasticsearch:
+  kibana:
+  hello-world-rest:
+  packetbeat:
+    external:
+      name: packetbeat
